@@ -1,0 +1,253 @@
+{
+    "$schema": "./schemas/hardware_db.schema.json",
+    "version": "1.0.0",
+    "lastUpdated": "2026-03-21",
+
+    "vendors": {
+        "asus": {
+            "name": "ASUS",
+            "website": "https://asus.com"
+        },
+        "steelseries": {
+            "name": "SteelSeries",
+            "website": "https://steelseries.com"
+        },
+        "evision": {
+            "name": "EVision",
+            "website": ""
+        },
+        "gskill": {
+            "name": "G.Skill",
+            "website": "https://gskill.com"
+        }
+    },
+
+    "devices": [
+        {
+            "id": "asus_aura_mainboard",
+            "name": "ASUS Aura Mainboard",
+            "vendor": "asus",
+            "type": "mainboard",
+            "protocol": "hid",
+
+            "identifiers": {
+                "vendorId": "0x0B05",
+                "productId": "0x19AF",
+                "usagePage": "0xFF72"
+            },
+
+            "capabilities": {
+                "color": true,
+                "brightness": true,
+                "modes": ["static", "breathing", "wave", "spectrum", "reactive"],
+                "zones": 8,
+                "addressable": true,
+                "ledsPerZone": 60
+            },
+
+            "protocol": {
+                "type": "asus_aura_hid",
+                "reportId": "0xB0",
+                "packetSize": 65,
+
+                "commands": {
+                    "setDirect": {
+                        "header": ["0xB0", "0x40"],
+                        "description": "Set direct color mode"
+                    },
+                    "setColor": {
+                        "header": ["0xB0", "0x40"],
+                        "colorOffset": 4,
+                        "format": "GRB",
+                        "description": "Set LED colors"
+                    },
+                    "setMode": {
+                        "header": ["0xB0", "0x35"],
+                        "modeOffset": 4,
+                        "modes": {
+                            "static": 0,
+                            "breathing": 1,
+                            "wave": 2,
+                            "spectrum": 4,
+                            "reactive": 7
+                        }
+                    },
+                    "commit": {
+                        "header": ["0xB0", "0x35", "0x00"],
+                        "description": "Commit changes to device"
+                    }
+                },
+
+                "initialization": [
+                    {"command": "setDirect", "delay": 50}
+                ]
+            }
+        },
+
+        {
+            "id": "steelseries_rival_600",
+            "name": "SteelSeries Rival 600",
+            "vendor": "steelseries",
+            "type": "mouse",
+            "protocol": "hid",
+
+            "identifiers": {
+                "vendorId": "0x1038",
+                "productId": "0x1724"
+            },
+
+            "capabilities": {
+                "color": true,
+                "brightness": true,
+                "modes": ["static", "breathing", "spectrum"],
+                "zones": 2
+            },
+
+            "protocol": {
+                "type": "steelseries_hid",
+                "reportId": "0x00",
+                "packetSize": 65,
+
+                "commands": {
+                    "setColor": {
+                        "header": ["0x05", "0x00"],
+                        "zones": {
+                            "logo": {"offset": 2},
+                            "wheel": {"offset": 5}
+                        },
+                        "format": "RGB"
+                    }
+                }
+            }
+        },
+
+        {
+            "id": "evision_keyboard",
+            "name": "EVision RGB Keyboard",
+            "vendor": "evision",
+            "type": "keyboard",
+            "bus": "hid",
+
+            "identifiers": {
+                "vendorId": "0x3299",
+                "productId": "0x4E9F",
+                "usagePage": "0xFF1C"
+            },
+
+            "capabilities": {
+                "color": true,
+                "brightness": true,
+                "speed": true,
+                "modes": ["static", "breathing", "wave", "reactive", "spectrum"],
+                "zones": 1
+            },
+
+            "protocol": {
+                "bus": "hid",
+                "type": "evision_v2",
+                "reportId": "0x04",
+                "packetSize": 64,
+
+                "commands": {
+                    "setColor": {
+                        "header": ["0x04", "0x0E", "0x02"],
+                        "colorOffset": 3,
+                        "format": "RGB"
+                    },
+                    "setMode": {
+                        "header": ["0x04", "0x0E", "0x01"],
+                        "modeOffset": 3,
+                        "modes": {
+                            "static": 6,
+                            "breathing": 5,
+                            "wave": 1,
+                            "reactive": 7,
+                            "spectrum": 4
+                        }
+                    },
+                    "setBrightness": {
+                        "header": ["0x04", "0x0E", "0x04"],
+                        "valueOffset": 3,
+                        "scale": 50
+                    },
+                    "setSpeed": {
+                        "header": ["0x04", "0x0E", "0x05"],
+                        "valueOffset": 3,
+                        "scale": 10
+                    }
+                }
+            }
+        },
+
+        {
+            "id": "gskill_trident_z5",
+            "name": "G.Skill Trident Z5 RGB",
+            "vendor": "gskill",
+            "type": "ram",
+            "protocol": "smbus",
+
+            "identifiers": {
+                "smbusAddresses": ["0x58", "0x59", "0x5A", "0x5B"]
+            },
+
+            "capabilities": {
+                "color": true,
+                "brightness": false,
+                "modes": ["static"],
+                "zones": 1,
+                "ledsPerZone": 8
+            },
+
+            "protocol": {
+                "type": "gskill_smbus",
+
+                "commands": {
+                    "setColor": {
+                        "register": "0x20",
+                        "format": "RGB",
+                        "perLed": true,
+                        "ledsPerSlot": 8,
+                        "registers": {
+                            "led0": ["0x20", "0x21", "0x22"],
+                            "led1": ["0x23", "0x24", "0x25"],
+                            "led2": ["0x26", "0x27", "0x28"],
+                            "led3": ["0x29", "0x2A", "0x2B"],
+                            "led4": ["0x2C", "0x2D", "0x2E"],
+                            "led5": ["0x2F", "0x30", "0x31"],
+                            "led6": ["0x32", "0x33", "0x34"],
+                            "led7": ["0x35", "0x36", "0x37"]
+                        }
+                    },
+                    "apply": {
+                        "register": "0xE0",
+                        "value": "0x01"
+                    }
+                },
+
+                "detection": {
+                    "probeRegister": "0x60",
+                    "expectedValue": "0x58"
+                }
+            }
+        }
+    ],
+
+    "protocolTemplates": {
+        "asus_aura_hid": {
+            "description": "ASUS Aura HID protocol for mainboards and GPUs",
+            "documentation": "docs/protocols/asus_aura.md"
+        },
+        "steelseries_hid": {
+            "description": "SteelSeries HID protocol for mice and keyboards",
+            "documentation": "docs/protocols/steelseries.md"
+        },
+        "evision_v2": {
+            "description": "EVision V2 HID protocol for keyboards",
+            "documentation": "docs/protocols/evision.md"
+        },
+        "gskill_smbus": {
+            "description": "G.Skill SMBus protocol for RGB RAM",
+            "documentation": "docs/protocols/gskill_smbus.md"
+        }
+    }
+}
