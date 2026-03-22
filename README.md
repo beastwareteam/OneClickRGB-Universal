@@ -1,22 +1,44 @@
 # OneClickRGB-Universal
 
-**Modular, Plugin-Based RGB Controller for Windows**
+**Cross-Platform, Plugin-Based RGB Controller**
 
 A complete rewrite of OneClickRGB with a universal device abstraction layer, enabling support for any RGB hardware through plugins.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-blue.svg)]()
+[![Windows](https://img.shields.io/badge/Platform-Windows-blue.svg)]()
+[![Linux](https://img.shields.io/badge/Platform-Linux-green.svg)]()
+[![macOS](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)]()
 
 ---
 
 ## Features
 
+- **Cross-Platform** - Windows, Linux, macOS support
 - **Plugin Architecture** - Add new devices without modifying core code
 - **Universal Device Interface** - Common API for all RGB hardware
-- **Protocol Bridges** - HID, SMBus, USB, Serial support
+- **Protocol Bridges** - HID, SMBus support (platform-dependent)
 - **Hardware Database** - JSON-based device definitions
 - **Auto-Detection** - Scan and identify connected RGB devices
+- **Auto-Provisioning** - Zero-config setup on new machines
 - **Build-Time Config** - Generate optimized code from JSON database
+
+---
+
+## Quick Start
+
+```bash
+# Scan and show detected devices
+oneclickrgb
+
+# Set color (all devices)
+oneclickrgb set 255 0 128
+
+# Turn off
+oneclickrgb off
+
+# Auto-provision based on hardware
+oneclickrgb provision --auto
+```
 
 ---
 
@@ -24,44 +46,66 @@ A complete rewrite of OneClickRGB with a universal device abstraction layer, ena
 
 | Device | Type | Protocol | Status |
 |--------|------|----------|--------|
-| ASUS Aura Mainboard | Mainboard | HID | Migrated |
-| SteelSeries Rival 600 | Mouse | HID | Migrated |
-| EVision Keyboard | Keyboard | HID | Migrated |
-| G.Skill Trident Z5 | RAM | SMBus | Migrated |
+| ASUS Aura Mainboard | Mainboard | HID | Supported |
+| SteelSeries Rival 600 | Mouse | HID | Supported |
+| EVision Keyboard | Keyboard | HID | Supported |
+| G.Skill Trident Z5 | RAM | SMBus | Supported (Win/Linux) |
 
-### Adding New Devices
+---
 
-See [docs/ADDING_DEVICES.md](docs/ADDING_DEVICES.md) for instructions on adding support for new hardware.
+## Platform Support
+
+| Feature | Windows | Linux | macOS |
+|---------|---------|-------|-------|
+| HID Devices | Yes | Yes | Yes |
+| SMBus (RAM) | Yes (PawnIO) | Yes (i2c-dev) | No |
+| Auto-Provisioning | Yes | Yes | Yes (HID only) |
+| Hardware Fingerprint | Yes | Yes | Yes |
 
 ---
 
 ## Architecture
 
-Aktueller Architekturstand, Zielarchitektur und vollständiger Umsetzungsplan (März 2026):
-
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     APPLICATION LAYER                        │
-│              (UI, Settings, Device Manager)                  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                        CORE LAYER                            │
-│           (DeviceRegistry, Profiles, Scanner)                │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                  DEVICE ABSTRACTION LAYER                    │
-│        IDevice → HIDDevice / SMBusDevice / USBDevice         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                      PROTOCOL LAYER                          │
-│         HIDBridge (hidapi) / SMBusBridge (PawnIO)           │
-└─────────────────────────────────────────────────────────────┘
+                    +-----------------------+
+                    |    Simple Interface   |
+                    |  OneClickRGB (3 APIs) |
+                    +-----------+-----------+
+                                |
+                    +-----------v-----------+
+                    |   Application Layer   |
+                    | DeviceService, Provis.|
+                    | ProfileResolver, etc. |
+                    +-----------+-----------+
+                                |
+                    +-----------v-----------+
+                    |   Platform Abstraction|
+                    |  IPlatform Interface  |
+                    +---+-------+-------+---+
+                        |       |       |
+              +---------+   +---+---+   +---------+
+              | Windows |   | Linux |   |  macOS  |
+              |   WMI   |   | sysfs |   |  IOKit  |
+              | PawnIO  |   |i2c-dev|   |   HID   |
+              +---------+   +-------+   +---------+
+                                |
+                    +-----------v-----------+
+                    |      Core Layer       |
+                    | Registry, Types, etc. |
+                    +-----------+-----------+
+                                |
+                    +-----------v-----------+
+                    |    Device Plugins     |
+                    | ASUS, SteelSeries,... |
+                    +-----------+-----------+
+                                |
+                    +-----------v-----------+
+                    |    Protocol Bridges   |
+                    |   HIDBridge, SMBus    |
+                    +-----------------------+
 ```
+
+Full architecture documentation: [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ---
 
@@ -69,26 +113,39 @@ Aktueller Architekturstand, Zielarchitektur und vollständiger Umsetzungsplan (M
 
 ### Prerequisites
 
-- Windows 10/11 (x64)
+**Windows:**
 - Visual Studio 2019+ Build Tools
 - Python 3.8+ (for config generation)
 
+**Linux:**
+```bash
+sudo apt install build-essential cmake libhidapi-dev libudev-dev
+sudo modprobe i2c-dev  # For SMBus support
+```
+
+**macOS:**
+```bash
+brew install cmake hidapi
+```
+
 ### Build Steps
 
-```batch
+```bash
 # 1. Generate hardware config from JSON database
 cd tools
 python generate_config.py
 
-# 2. Build the application
-cd ../build
-compile.bat
+# 2. Build with CMake
+mkdir build && cd build
+cmake ..
+cmake --build .
 ```
 
-### Dependencies
-
-- **hidapi** - USB HID communication
-- **PawnIO** - SMBus access for RAM control (optional)
+**Windows (Visual Studio):**
+```batch
+cd build
+compile.bat
+```
 
 ---
 
@@ -97,59 +154,121 @@ compile.bat
 ```
 OneClickRGB-Universal/
 ├── src/
-│   ├── OneClickRGB.h           # Simple API (include this!)
-│   ├── OneClickRGB.cpp
-│   ├── main.cpp                # CLI entry point
-│   ├── app/                    # Application layer (advanced)
-│   │   ├── config/
-│   │   ├── effects/
-│   │   ├── pipeline/
-│   │   └── services/
-│   ├── core/                   # Core types, DeviceRegistry
-│   ├── devices/                # IDevice, HIDDevice, SMBusDevice
-│   ├── plugins/                # Device implementations
-│   │   ├── asus/
-│   │   ├── steelseries/
-│   │   ├── evision/
-│   │   ├── gskill/
-│   │   └── PluginFactory.cpp
-│   ├── bridges/                # Protocol bridges
-│   └── scanner/                # Hardware detection
+│   ├── OneClickRGB.h/cpp         # Simple API (just include this!)
+│   ├── main.cpp                  # CLI entry point
+│   │
+│   ├── app/                      # Application Layer
+│   │   ├── config/               # Configuration & Bundle Parser
+│   │   ├── effects/              # Effect Factory (Static, Breathing, etc.)
+│   │   ├── fingerprint/          # Machine Fingerprint
+│   │   ├── pipeline/             # Device Pipeline
+│   │   └── services/             # DeviceService, Provisioning, ProfileResolver
+│   │
+│   ├── core/                     # Core Layer
+│   │   ├── Types.h               # RGB, DeviceMode, Capabilities, Result
+│   │   ├── DeviceRegistry.h/cpp  # Central device management
+│   │   └── DryRunMode.h          # Test mode without hardware
+│   │
+│   ├── devices/                  # Device Abstraction
+│   │   ├── IDevice.h             # Device interface contract
+│   │   ├── HIDDevice.h/cpp       # HID device base class
+│   │   └── SMBusDevice.h/cpp     # SMBus device base class
+│   │
+│   ├── plugins/                  # Device Plugins
+│   │   ├── PluginFactory.h/cpp   # Central plugin registration
+│   │   ├── asus/                 # ASUS Aura Controller
+│   │   ├── steelseries/          # SteelSeries Devices
+│   │   ├── evision/              # EVision Keyboards
+│   │   └── gskill/               # G.Skill RAM
+│   │
+│   ├── bridges/                  # Protocol Bridges
+│   │   ├── IBridge.h             # Bridge interface
+│   │   ├── HIDBridge.h/cpp       # HID protocol (HIDAPI)
+│   │   └── SMBusBridge.h/cpp     # SMBus protocol
+│   │
+│   ├── scanner/                  # Hardware Detection
+│   │   └── HardwareScanner.h/cpp
+│   │
+│   └── platform/                 # Platform Abstraction Layer
+│       ├── IPlatform.h           # Platform interface
+│       ├── PlatformFactory.cpp   # Platform factory
+│       ├── windows/              # Windows implementation (WMI, PawnIO)
+│       ├── linux/                # Linux implementation (sysfs, i2c-dev)
+│       └── macos/                # macOS implementation (IOKit)
+│
 ├── config/
-│   ├── hardware_db.json        # Device database
-│   └── *.schema.json           # JSON schemas
+│   ├── hardware_db.json          # Device database
+│   ├── hardware_db.schema.json   # Database schema
+│   └── config_bundle.schema.json # ConfigBundle schema
+│
+├── tests/
+│   ├── TestFramework.h           # Minimal test framework
+│   ├── test_main.cpp             # Test runner
+│   └── test_*.cpp                # Unit tests
+│
 ├── docs/
-└── build/
-    └── generated/
+│   ├── CONFIG_STRUCTURE.md       # Configuration documentation
+│   ├── CROSS_PLATFORM_ARCHITECTURE.md
+│   └── LEGACY_FEATURE_EXTRACTION.md
+│
+├── build/
+│   ├── generated/                # Generated headers
+│   ├── compile.bat               # Windows build script
+│   └── build.bat
+│
+├── tools/
+│   └── generate_config.py        # Config generator
+│
+├── dependencies/
+│   └── hidapi/                   # HIDAPI headers
+│
+├── ARCHITECTURE.md               # Full architecture documentation
+├── CMakeLists.txt                # CMake build configuration
+└── README.md                     # This file
 ```
 
 ---
 
 ## Usage
 
-### Command Line (No Configuration Required)
+### Command Line Interface
 
-```batch
-# Show detected devices
-oneclickrgb
+```bash
+# Basic Commands
+oneclickrgb                        # Show detected devices
+oneclickrgb set 255 0 128          # Set color (RGB)
+oneclickrgb set #FF0080            # Set color (Hex)
+oneclickrgb off                    # Turn off all LEDs
+oneclickrgb mode static            # Set mode
+oneclickrgb brightness 50          # Set brightness (0-100)
+oneclickrgb status                 # Show device status
 
-# Set color (RGB values)
-oneclickrgb set 255 0 128
+# Provisioning Commands
+oneclickrgb provision --auto       # Auto-provision from fingerprint
+oneclickrgb provision --check      # Check for drift
+oneclickrgb provision --self-heal  # Auto-repair drift
+oneclickrgb provision --rollback   # Rollback to previous config
+oneclickrgb provision --fingerprint # Show hardware fingerprint
+oneclickrgb provision --status     # Show provisioning status
 
-# Set color (hex)
-oneclickrgb set #FF0080
-
-# Turn off all LEDs
-oneclickrgb off
-
-# Change mode
-oneclickrgb mode rainbow
-
-# Set brightness
-oneclickrgb brightness 50
+# Options
+--dry-run                          # Simulate without hardware
+--verbose                          # Detailed output
+--json                             # JSON output for scripting
 ```
 
-### C++ (Simple API)
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | Invalid arguments |
+| 2 | No devices found |
+| 3 | Device communication error |
+| 4 | Configuration error |
+| 5 | Permission denied |
+
+### C++ Simple API
 
 ```cpp
 #include "OneClickRGB.h"
@@ -164,7 +283,7 @@ int main() {
 }
 ```
 
-### C++ (Global Functions)
+### C++ Global Functions
 
 ```cpp
 #include "OneClickRGB.h"
@@ -178,49 +297,65 @@ int main() {
 }
 ```
 
-### Advanced Usage (Full Control)
-
-For advanced use cases requiring per-device control, profiles, or custom pipelines:
+### Advanced Usage
 
 ```cpp
 #include "app/services/DeviceService.h"
-#include "core/DeviceRegistry.h"
+#include "app/services/ProvisioningService.h"
+#include "platform/IPlatform.h"
 
 int main() {
-    App::DeviceService service;
-    service.DiscoverAndRegister();
+    // Initialize platform
+    auto platform = OCRGB::Platform::IPlatform::Create();
+    platform->Initialize();
+
+    // Auto-provision
+    OCRGB::App::ProvisioningService provisioning;
+    provisioning.AutoProvision();
 
     // Per-device control
-    auto devices = DeviceRegistry::Instance().GetAllDevices();
+    auto devices = OCRGB::DeviceRegistry::Instance().GetAllDevices();
     for (auto& device : devices) {
         device->SetColor(RGB(255, 0, 0));
         device->Apply();
     }
 
+    platform->Shutdown();
     return 0;
 }
 ```
 
 ---
 
-## Relationship to OneClickRGB
+## Documentation
 
-This is a **fork/rewrite** of the original [OneClickRGB](https://github.com/beastwareteam/OneClickRGB) project.
-
-| OneClickRGB | OneClickRGB-Universal |
-|-------------|----------------------|
-| Monolithic (~4500 LOC) | Modular plugin architecture |
-| Hardcoded protocols | JSON-defined protocols |
-| 4 fixed devices | Extensible device support |
-| Single file | Clean separation of concerns |
-
-The original OneClickRGB remains stable for users who only need the four supported devices. OneClickRGB-Universal is for users who want extensibility.
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Full architecture, roadmap, all systems |
+| [docs/CONFIG_STRUCTURE.md](docs/CONFIG_STRUCTURE.md) | Configuration and pipeline documentation |
+| [docs/CROSS_PLATFORM_ARCHITECTURE.md](docs/CROSS_PLATFORM_ARCHITECTURE.md) | Platform abstraction details |
+| [docs/LEGACY_FEATURE_EXTRACTION.md](docs/LEGACY_FEATURE_EXTRACTION.md) | Migration from original OneClickRGB |
 
 ---
 
-## License
+## Tests
 
-MIT License - See [LICENSE](LICENSE) for details.
+```bash
+# Build and run tests
+cd build
+cmake .. -DBUILD_TESTS=ON
+cmake --build .
+./test_runner
+```
+
+Test coverage:
+- Types and data structures
+- DeviceRegistry operations
+- Effect generation
+- Configuration parsing
+- ConfigBundle validation
+- Dry-run mode
+- Platform abstraction
 
 ---
 
@@ -228,7 +363,15 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 1. Fork the repository
 2. Add your device in `src/plugins/<vendor>/`
-3. Create `device.json` with protocol definition
-4. Submit a pull request
+3. Register in `src/plugins/PluginFactory.cpp`
+4. Add device to `config/hardware_db.json`
+5. Write tests in `tests/`
+6. Submit a pull request
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for technical guidelines.
+
+---
+
+## License
+
+MIT License - See [LICENSE](LICENSE) for details.

@@ -5,6 +5,24 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # =============================================================================
+# Platform Detection
+# =============================================================================
+if(WIN32)
+    set(OCRGB_PLATFORM "WINDOWS")
+    add_definitions(-DOCRGB_PLATFORM_WINDOWS)
+elseif(APPLE)
+    set(OCRGB_PLATFORM "MACOS")
+    add_definitions(-DOCRGB_PLATFORM_MACOS)
+elseif(UNIX)
+    set(OCRGB_PLATFORM "LINUX")
+    add_definitions(-DOCRGB_PLATFORM_LINUX)
+else()
+    message(FATAL_ERROR "Unsupported platform")
+endif()
+
+message(STATUS "Target platform: ${OCRGB_PLATFORM}")
+
+# =============================================================================
 # Options
 # =============================================================================
 option(BUILD_TESTS "Build unit tests" ON)
@@ -46,10 +64,43 @@ set(INTERFACE_SOURCES
     src/OneClickRGB.cpp
 )
 
+# Platform abstraction sources (common)
+set(PLATFORM_SOURCES
+    src/platform/PlatformFactory.cpp
+)
+
+# Platform-specific sources
+if(WIN32)
+    list(APPEND PLATFORM_SOURCES
+        src/platform/windows/WindowsPlatform.cpp
+        src/platform/windows/WmiSystemInfo.cpp
+        src/platform/windows/WindowsDeviceEnumerator.cpp
+        src/platform/windows/PawnIOSMBus.cpp
+    )
+elseif(APPLE)
+    list(APPEND PLATFORM_SOURCES
+        src/platform/macos/MacOSPlatform.cpp
+        src/platform/macos/IOKitSystemInfo.cpp
+        src/platform/macos/MacOSDeviceEnumerator.cpp
+    )
+elseif(UNIX)
+    list(APPEND PLATFORM_SOURCES
+        src/platform/linux/LinuxPlatform.cpp
+        src/platform/linux/SysfsSystemInfo.cpp
+        src/platform/linux/LinuxDeviceEnumerator.cpp
+        src/platform/linux/I2CDevSMBus.cpp
+    )
+endif()
+
 # =============================================================================
 # Core Library
 # =============================================================================
-add_library(ocrgb_core STATIC ${CORE_SOURCES} ${APP_SOURCES} ${INTERFACE_SOURCES})
+add_library(ocrgb_core STATIC
+    ${CORE_SOURCES}
+    ${APP_SOURCES}
+    ${INTERFACE_SOURCES}
+    ${PLATFORM_SOURCES}
+)
 
 target_include_directories(ocrgb_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -57,9 +108,52 @@ target_include_directories(ocrgb_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/hidapi
 )
 
-# Windows-specific libraries
+# =============================================================================
+# Platform-Specific Dependencies
+# =============================================================================
 if(WIN32)
-    target_link_libraries(ocrgb_core PUBLIC setupapi hid)
+    # Windows: SetupAPI, HID, WMI (wbemuuid), OLE
+    target_link_libraries(ocrgb_core PUBLIC
+        setupapi
+        hid
+        wbemuuid
+        ole32
+        oleaut32
+    )
+elseif(APPLE)
+    # macOS: IOKit, CoreFoundation, HIDAPI
+    find_library(IOKIT_FRAMEWORK IOKit REQUIRED)
+    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+
+    target_link_libraries(ocrgb_core PUBLIC
+        ${IOKIT_FRAMEWORK}
+        ${COREFOUNDATION_FRAMEWORK}
+    )
+
+    # Find HIDAPI (via Homebrew or pkg-config)
+    find_package(PkgConfig)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(HIDAPI hidapi)
+        if(HIDAPI_FOUND)
+            target_include_directories(ocrgb_core PUBLIC ${HIDAPI_INCLUDE_DIRS})
+            target_link_libraries(ocrgb_core PUBLIC ${HIDAPI_LIBRARIES})
+        endif()
+    endif()
+elseif(UNIX)
+    # Linux: libudev, HIDAPI
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(UDEV libudev)
+    pkg_check_modules(HIDAPI hidapi-libusb)
+
+    if(UDEV_FOUND)
+        target_include_directories(ocrgb_core PUBLIC ${UDEV_INCLUDE_DIRS})
+        target_link_libraries(ocrgb_core PUBLIC ${UDEV_LIBRARIES})
+    endif()
+
+    if(HIDAPI_FOUND)
+        target_include_directories(ocrgb_core PUBLIC ${HIDAPI_INCLUDE_DIRS})
+        target_link_libraries(ocrgb_core PUBLIC ${HIDAPI_LIBRARIES})
+    endif()
 endif()
 
 # =============================================================================
@@ -99,6 +193,14 @@ endif()
 # =============================================================================
 message(STATUS "")
 message(STATUS "OneClickRGB-Universal ${PROJECT_VERSION}")
+message(STATUS "  Platform:    ${OCRGB_PLATFORM}")
 message(STATUS "  Build CLI:   ${BUILD_CLI}")
 message(STATUS "  Build Tests: ${BUILD_TESTS}")
+if(WIN32)
+    message(STATUS "  SMBus:       PawnIO driver")
+elseif(APPLE)
+    message(STATUS "  SMBus:       Not available (HID only)")
+elseif(UNIX)
+    message(STATUS "  SMBus:       i2c-dev kernel module")
+endif()
 message(STATUS "")

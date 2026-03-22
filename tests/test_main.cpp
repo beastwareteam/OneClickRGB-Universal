@@ -17,6 +17,7 @@
 #include "test_config.cpp"
 #include "test_bundle_parser.cpp"
 #include "test_dryrun.cpp"
+#include "test_platform.cpp"
 
 int main() {
     std::cout << "========================================\n";

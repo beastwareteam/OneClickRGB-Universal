@@ -34,35 +34,59 @@ Komplexität (Profile, Provisioning, per-Device-Control) ist optional und verste
 
 *Letzte Verifizierung: 2026-03-22*
 
+Vollständige Dateiliste: [docs/REPOSITORY_STRUCTURE.md](docs/REPOSITORY_STRUCTURE.md)
+
 ### Vorhanden und funktionsfähig
 
+**Core Layer:**
 - `IDevice`, `HIDDevice`, `SMBusDevice` mit `Result`-basiertem API
 - `IBridge`, `HIDBridge`, `SMBusBridge`
 - `DeviceRegistry` mit Bulk-Operationen (`SetColorAll`, `ApplyAll`, ...)
+- `Types.h` mit RGB, DeviceMode, Capabilities, Result, ResultCode
+- `DryRunMode` für Tests ohne Hardware
+
+**Scanner & Plugins:**
 - `HardwareScanner` für HID/SMBus und Matching gegen `build/generated/hardware_config.h`
-- `HardwareScanner::CreateDevice()` implementiert via `PluginFactory::Create()`
 - `PluginFactory` als zentrale Mapping-Stelle für Device-Erzeugung
 - Plugin-Verzeichnisse: `asus`, `steelseries`, `evision`, `gskill`
 - Build-Konfigurationspfad über `tools/generate_config.py` und `build/generated/`
-- `src/app/` mit Application-Layer-Komponenten:
-  - `pipeline/DevicePipeline` — Orchestrierung von Fingerprint → Apply → Verify
-  - `config/DeviceConfiguration` — Getter/Setup für Profile
-  - `effects/EffectFactory` — 2D-Effektsequenzen (Frame × Zone)
-- `docs/` mit Basisdokumenten:
-  - `LEGACY_FEATURE_EXTRACTION.md` — Feature-Mapping aus Vorgänger
-  - `CONFIG_STRUCTURE.md` — Konfigurationsstruktur und Pipeline-Stages
 
-### Noch offen / unvollständig
+**Application Layer:**
+- `DeviceService` — Discovery, Registrierung, Orchestrierung
+- `ProvisioningService` — Auto-Config mit State Machine (Bootstrap → Healthy)
+- `ProfileResolver` — Regelbasierte Profilzuordnung mit Prioritäten
+- `MachineFingerprint` — Hardware-Identifikation (Mainboard, CPU, GPU, RAM)
+- `DevicePipeline` — Orchestrierung von Fingerprint → Apply → Verify
+- `DeviceConfiguration` — Getter/Setup für Profile
+- `EffectFactory` — 2D-Effektsequenzen (Frame × Zone)
+- `ConfigBundleParser` — Parser für ConfigBundle-JSON
 
-- `src/ui/` ist derzeit leer (GUI Phase 2)
-- `tests/` ist derzeit leer (Testpyramide Phase 4)
-- Keine klar getrennte Interface-Schicht (`IInterface`) im Code
-- Kein Runtime-Plugin-Loader (derzeit statisch/kompilierzeitnah)
-- `ProvisioningService`, `MachineFingerprint`, `ProfileResolver` nicht implementiert
-- ConfigBundle-Parser fehlt (Schema vorhanden, kein Loader)
-- CLI nicht implementiert
+**Platform Abstraction:**
+- `IPlatform` Interface mit ISystemInfo, IDeviceEnumerator, ISMBusProvider
+- **Windows:** WMI, SetupAPI, PawnIO (SMBus)
+- **Linux:** sysfs/DMI, i2c-dev (SMBus)
+- **macOS:** IOKit, sysctl (kein SMBus)
 
-Diese Lücken sind die primären Architektur- und Delivery-Risiken für Phase 1/1.5.
+**Interface:**
+- `OneClickRGB.h/cpp` — Einfaches API (3 Methoden)
+- `main.cpp` — Vollständige CLI mit Exit-Codes und JSON-Output
+
+**Tests:**
+- 8 Test-Dateien: Types, Registry, Effects, Config, BundleParser, DryRun, Platform
+- Minimales Test-Framework ohne externe Abhängigkeiten
+
+**Dokumentation:**
+- `ARCHITECTURE.md` — Hauptarchitektur (24 Sektionen)
+- `docs/REPOSITORY_STRUCTURE.md` — Vollständige Dateistruktur
+- `docs/CONFIG_STRUCTURE.md` — Konfiguration und Pipelines
+- `docs/CROSS_PLATFORM_ARCHITECTURE.md` — Plattform-Abstraktion
+- `docs/LEGACY_FEATURE_EXTRACTION.md` — Feature-Mapping aus Vorgänger
+
+### Noch offen / geplant
+
+- `src/ui/` — GUI (Phase 2)
+- Runtime-Plugin-Loader (derzeit statisch/kompilierzeitnah)
+- Online-Bundle-Verteilung (optional Phase 3)
 
 ---
 
@@ -920,17 +944,27 @@ Damit keine Sackgasse durch unklare Ownership entsteht, gelten folgende Source-o
 - ConfigBundle-Schema: `config/config_bundle.schema.json`
 - Generierte Gerätedefinitionen: `build/generated/hardware_config.h`
 
+### Platform Abstraction Layer
+
+- Interface-Definitionen: `src/platform/IPlatform.h`
+- Factory: `src/platform/PlatformFactory.cpp`
+- Windows: `src/platform/windows/` (WmiSystemInfo, WindowsDeviceEnumerator, PawnIOSMBus)
+- Linux: `src/platform/linux/` (SysfsSystemInfo, LinuxDeviceEnumerator, I2CDevSMBus)
+- macOS: `src/platform/macos/` (IOKitSystemInfo, MacOSDeviceEnumerator)
+
 ### Tests
 
 - Test-Framework: `tests/TestFramework.h`
 - Test-Runner: `tests/test_main.cpp`
-- Unit-Tests: `tests/test_types.cpp`, `tests/test_registry.cpp`, `tests/test_effects.cpp`, `tests/test_config.cpp`, `tests/test_bundle_parser.cpp`, `tests/test_dryrun.cpp`
+- Unit-Tests: `tests/test_types.cpp`, `tests/test_registry.cpp`, `tests/test_effects.cpp`, `tests/test_config.cpp`, `tests/test_bundle_parser.cpp`, `tests/test_dryrun.cpp`, `tests/test_platform.cpp`
 
 ### Dokumentation
 
 - Architektur und Roadmap: `ARCHITECTURE.md`
+- Repository-Struktur: `docs/REPOSITORY_STRUCTURE.md`
+- Cross-Platform-Architektur: `docs/CROSS_PLATFORM_ARCHITECTURE.md`
+- Konfigurationsstruktur: `docs/CONFIG_STRUCTURE.md`
 - Legacy-Feature-Extraktion: `docs/LEGACY_FEATURE_EXTRACTION.md`
-- Detaildokument zur Konfigurationsstruktur: `docs/CONFIG_STRUCTURE.md`
 
 ### Für den aktuellen Scope explizit ausgeschlossen
 
@@ -938,3 +972,214 @@ Damit keine Sackgasse durch unklare Ownership entsteht, gelten folgende Source-o
 - Online-APIs
 - Übersetzungen (i18n)
 - Barrierefreiheit
+
+---
+
+## 24) Plattformübergreifende Architektur
+
+### Übersicht
+
+OneClickRGB-Universal unterstützt drei Plattformen:
+
+| Plattform | System-Info | Device-Enumeration | SMBus | HID |
+|-----------|-------------|-------------------|-------|-----|
+| Windows | WMI | SetupAPI + HIDAPI | PawnIO | ✓ |
+| Linux | sysfs/DMI | sysfs + HIDAPI | i2c-dev | ✓ |
+| macOS | IOKit/sysctl | IOKit + HIDAPI | ✗ | ✓ |
+
+### Platform Abstraction Layer
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Application Layer                         │
+│     DeviceService | ProvisioningService | ProfileResolver    │
+└───────────────────────────────┬─────────────────────────────┘
+                                │
+┌───────────────────────────────▼─────────────────────────────┐
+│                    Platform Abstraction                      │
+│                      IPlatform Interface                     │
+│   ┌─────────────────┬─────────────────┬─────────────────┐   │
+│   │  ISystemInfo    │ IDeviceEnumerator│ ISMBusProvider  │   │
+│   └─────────────────┴─────────────────┴─────────────────┘   │
+└───────────────────────────────┬─────────────────────────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        ▼                       ▼                       ▼
+┌───────────────┐       ┌───────────────┐       ┌───────────────┐
+│    Windows    │       │     Linux     │       │     macOS     │
+├───────────────┤       ├───────────────┤       ├───────────────┤
+│ WmiSystemInfo │       │SysfsSystemInfo│       │IOKitSystemInfo│
+│ WinDeviceEnum │       │LinuxDeviceEnum│       │MacOSDeviceEnum│
+│ PawnIOSMBus   │       │ I2CDevSMBus   │       │      n/a      │
+└───────────────┘       └───────────────┘       └───────────────┘
+```
+
+### IPlatform Interface
+
+```cpp
+class IPlatform {
+public:
+    static std::unique_ptr<IPlatform> Create();  // Factory
+
+    // Subsystems
+    virtual ISystemInfo* GetSystemInfo() = 0;
+    virtual IDeviceEnumerator* GetDeviceEnumerator() = 0;
+    virtual ISMBusProvider* GetSMBusProvider() = 0;
+
+    // Capabilities
+    virtual bool HasSMBusSupport() const = 0;
+    virtual bool RequiresElevation() const = 0;
+    virtual bool IsElevated() const = 0;
+
+    // Lifecycle
+    virtual bool Initialize() = 0;
+    virtual void Shutdown() = 0;
+};
+```
+
+### Plattform-spezifische Implementierungen
+
+#### Windows (`src/platform/windows/`)
+
+| Datei | Beschreibung |
+|-------|--------------|
+| `WindowsPlatform.cpp/h` | Hauptklasse, COM-Initialisierung |
+| `WmiSystemInfo.cpp/h` | WMI-basierte Hardware-Info |
+| `WindowsDeviceEnumerator.cpp/h` | SetupAPI + HIDAPI |
+| `PawnIOSMBus.cpp/h` | PawnIO-Treiber für SMBus |
+
+**WMI-Abfragen:**
+- `Win32_BaseBoard` → Mainboard-Info
+- `Win32_Processor` → CPU-Info
+- `Win32_VideoController` → GPU-Info
+- `Win32_PhysicalMemory` → RAM-Module
+- `Win32_BIOS` → BIOS-Version
+
+#### Linux (`src/platform/linux/`)
+
+| Datei | Beschreibung |
+|-------|--------------|
+| `LinuxPlatform.cpp/h` | Hauptklasse, i2c-Gruppen-Check |
+| `SysfsSystemInfo.cpp/h` | sysfs/DMI-basierte Hardware-Info |
+| `LinuxDeviceEnumerator.cpp/h` | sysfs USB + HIDAPI |
+| `I2CDevSMBus.cpp/h` | i2c-dev Kernel-Modul |
+
+**sysfs-Pfade:**
+- `/sys/class/dmi/id/` → DMI-Informationen
+- `/proc/cpuinfo` → CPU-Details
+- `/dev/i2c-*` → I2C/SMBus-Zugriff
+
+**Voraussetzungen:**
+```bash
+# i2c-dev Modul laden
+sudo modprobe i2c-dev
+
+# Benutzer zur i2c-Gruppe hinzufügen
+sudo usermod -aG i2c $USER
+```
+
+#### macOS (`src/platform/macos/`)
+
+| Datei | Beschreibung |
+|-------|--------------|
+| `MacOSPlatform.cpp/h` | Hauptklasse |
+| `IOKitSystemInfo.cpp/h` | IOKit + sysctl |
+| `MacOSDeviceEnumerator.cpp/h` | IOKit + HIDAPI |
+
+**APIs:**
+- `IORegistryEntry` → Hardware-Registrierung
+- `sysctlbyname()` → System-Informationen
+- `IOServiceMatching()` → USB/PCI-Enumeration
+
+**Einschränkungen:**
+- Kein direkter SMBus-Zugriff
+- Nur HID-Geräte werden vollständig unterstützt
+
+### Build-Konfiguration (CMake)
+
+```cmake
+# Platform Detection
+if(WIN32)
+    add_definitions(-DOCRGB_PLATFORM_WINDOWS)
+elseif(APPLE)
+    add_definitions(-DOCRGB_PLATFORM_MACOS)
+elseif(UNIX)
+    add_definitions(-DOCRGB_PLATFORM_LINUX)
+endif()
+
+# Platform-specific Sources
+if(WIN32)
+    list(APPEND PLATFORM_SOURCES
+        src/platform/windows/WindowsPlatform.cpp
+        src/platform/windows/WmiSystemInfo.cpp
+        src/platform/windows/WindowsDeviceEnumerator.cpp
+        src/platform/windows/PawnIOSMBus.cpp
+    )
+    target_link_libraries(ocrgb_core PUBLIC setupapi hid wbemuuid ole32 oleaut32)
+elseif(APPLE)
+    list(APPEND PLATFORM_SOURCES
+        src/platform/macos/MacOSPlatform.cpp
+        src/platform/macos/IOKitSystemInfo.cpp
+        src/platform/macos/MacOSDeviceEnumerator.cpp
+    )
+    target_link_libraries(ocrgb_core PUBLIC "-framework IOKit" "-framework CoreFoundation")
+elseif(UNIX)
+    list(APPEND PLATFORM_SOURCES
+        src/platform/linux/LinuxPlatform.cpp
+        src/platform/linux/SysfsSystemInfo.cpp
+        src/platform/linux/LinuxDeviceEnumerator.cpp
+        src/platform/linux/I2CDevSMBus.cpp
+    )
+    target_link_libraries(ocrgb_core PUBLIC udev hidapi-libusb)
+endif()
+```
+
+### Feature-Matrix
+
+| Feature | Windows | Linux | macOS |
+|---------|---------|-------|-------|
+| HID-Geräte | ✓ | ✓ | ✓ |
+| SMBus-RAM (DDR4/DDR5) | ✓ | ✓ | ✗ |
+| USB-Enumeration | ✓ | ✓ | ✓ |
+| Hardware-Fingerprint | ✓ | ✓ | ✓ |
+| Auto-Provisioning | ✓ | ✓ | ✓ (nur HID) |
+| Elevation-Check | ✓ | ✓ | ✓ |
+
+### Migrations-Anleitung
+
+Bestehender Windows-spezifischer Code muss über das Platform-Interface abstrahiert werden:
+
+**Vorher (direkt):**
+```cpp
+#include <Wbemidl.h>
+// Direkter WMI-Aufruf
+```
+
+**Nachher (abstrahiert):**
+```cpp
+auto platform = IPlatform::Create();
+auto sysInfo = platform->GetSystemInfo();
+std::string cpuName = sysInfo->GetCpuName();
+```
+
+### Dateien im Platform-Layer
+
+```
+src/platform/
+├── IPlatform.h              # Interface-Definitionen
+├── PlatformFactory.cpp      # Factory für Platform-Erstellung
+├── windows/
+│   ├── WindowsPlatform.h/cpp
+│   ├── WmiSystemInfo.h/cpp
+│   ├── WindowsDeviceEnumerator.h/cpp
+│   └── PawnIOSMBus.h/cpp
+├── linux/
+│   ├── LinuxPlatform.h/cpp
+│   ├── SysfsSystemInfo.h/cpp
+│   ├── LinuxDeviceEnumerator.h/cpp
+│   └── I2CDevSMBus.h/cpp
+└── macos/
+    ├── MacOSPlatform.h/cpp
+    ├── IOKitSystemInfo.h/cpp
+    └── MacOSDeviceEnumerator.h/cpp
+```
