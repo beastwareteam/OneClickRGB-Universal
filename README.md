@@ -46,21 +46,22 @@ oneclickrgb provision --auto
 
 ## Supported Devices
 
-| Device | Type | Protocol | Status |
-|--------|------|----------|--------|
-| ASUS Aura Mainboard | Mainboard | HID | Supported |
-| SteelSeries Rival 600 | Mouse | HID | Supported |
-| EVision Keyboard | Keyboard | HID | Supported |
-| G.Skill Trident Z5 | RAM | SMBus | Supported (Win/Linux) |
-| WS2812B / NeoPixel | LED Strip | GPIO | Supported (Pi) |
-| APA102 / DotStar | LED Strip | SPI | Supported (Pi) |
-| PWM RGB LED | Single LED | PWM | Supported (Pi) |
+<p align="center">
+  <img src="https://img.shields.io/badge/Devices-50+-brightgreen" alt="50+ Devices"/>
+  <img src="https://img.shields.io/badge/Brands-15+-blue" alt="15+ Brands"/>
+</p>
 
-### Raspberry Pi
+| Category | Brands |
+|----------|--------|
+| **Mainboards** | ASUS, MSI, Gigabyte, ASRock |
+| **RAM** | G.Skill, Corsair, Kingston, TeamGroup |
+| **GPUs** | ASUS, MSI, Gigabyte, EVGA |
+| **Keyboards** | Corsair, Razer, SteelSeries, Logitech, HyperX |
+| **Mice** | SteelSeries, Razer, Logitech, Corsair, Glorious |
+| **Cooling** | Corsair, NZXT, Thermaltake, be quiet! |
+| **Raspberry Pi** | WS2812B, APA102, PWM LEDs |
 
-See [docs/RASPBERRY_PI.md](docs/RASPBERRY_PI.md) for GPIO wiring and setup.
-| EVision Keyboard | Keyboard | HID | Supported |
-| G.Skill Trident Z5 | RAM | SMBus | Supported (Win/Linux) |
+**[→ Vollständige Hardware-Liste](SUPPORTED_HARDWARE.md)**
 
 ---
 
