@@ -8,15 +8,17 @@ A complete rewrite of OneClickRGB with a universal device abstraction layer, ena
 [![Windows](https://img.shields.io/badge/Platform-Windows-blue.svg)]()
 [![Linux](https://img.shields.io/badge/Platform-Linux-green.svg)]()
 [![macOS](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)]()
+[![Raspberry Pi](https://img.shields.io/badge/Platform-Raspberry%20Pi-c51a4a.svg)]()
 
 ---
 
 ## Features
 
-- **Cross-Platform** - Windows, Linux, macOS support
+- **Cross-Platform** - Windows, Linux, macOS, Raspberry Pi support
 - **Plugin Architecture** - Add new devices without modifying core code
 - **Universal Device Interface** - Common API for all RGB hardware
-- **Protocol Bridges** - HID, SMBus support (platform-dependent)
+- **Protocol Bridges** - HID, SMBus, GPIO support (platform-dependent)
+- **Raspberry Pi GPIO** - WS2812B, APA102, PWM RGB LEDs
 - **Hardware Database** - JSON-based device definitions
 - **Auto-Detection** - Scan and identify connected RGB devices
 - **Auto-Provisioning** - Zero-config setup on new machines
@@ -48,6 +50,15 @@ oneclickrgb provision --auto
 |--------|------|----------|--------|
 | ASUS Aura Mainboard | Mainboard | HID | Supported |
 | SteelSeries Rival 600 | Mouse | HID | Supported |
+| EVision Keyboard | Keyboard | HID | Supported |
+| G.Skill Trident Z5 | RAM | SMBus | Supported (Win/Linux) |
+| WS2812B / NeoPixel | LED Strip | GPIO | Supported (Pi) |
+| APA102 / DotStar | LED Strip | SPI | Supported (Pi) |
+| PWM RGB LED | Single LED | PWM | Supported (Pi) |
+
+### Raspberry Pi
+
+See [docs/RASPBERRY_PI.md](docs/RASPBERRY_PI.md) for GPIO wiring and setup.
 | EVision Keyboard | Keyboard | HID | Supported |
 | G.Skill Trident Z5 | RAM | SMBus | Supported (Win/Linux) |
 

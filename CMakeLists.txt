@@ -27,6 +27,9 @@ message(STATUS "Target platform: ${OCRGB_PLATFORM}")
 # =============================================================================
 option(BUILD_TESTS "Build unit tests" ON)
 option(BUILD_CLI "Build command-line interface" ON)
+option(ENABLE_GPIO "Enable GPIO support (Raspberry Pi)" ON)
+option(ENABLE_WS281X "Enable WS2812B support (requires rpi_ws281x)" OFF)
+option(ENABLE_PIGPIO "Enable pigpio for PWM control" OFF)
 
 # =============================================================================
 # Sources
@@ -37,8 +40,10 @@ set(CORE_SOURCES
     src/core/DeviceRegistry.cpp
     src/devices/HIDDevice.cpp
     src/devices/SMBusDevice.cpp
+    src/devices/GPIODevice.cpp
     src/bridges/HIDBridge.cpp
     src/bridges/SMBusBridge.cpp
+    src/bridges/GPIOBridge.cpp
     src/scanner/HardwareScanner.cpp
     src/plugins/PluginFactory.cpp
     src/plugins/asus/AsusAuraController.cpp
@@ -46,6 +51,13 @@ set(CORE_SOURCES
     src/plugins/evision/EVisionKeyboard.cpp
     src/plugins/gskill/GSkillTridentZ5.cpp
 )
+
+# GPIO plugins (Linux/Raspberry Pi only)
+if(UNIX AND NOT APPLE AND ENABLE_GPIO)
+    list(APPEND CORE_SOURCES
+        src/plugins/gpio/WS2812Controller.cpp
+    )
+endif()
 
 # Application layer sources
 set(APP_SOURCES
@@ -154,6 +166,35 @@ elseif(UNIX)
         target_include_directories(ocrgb_core PUBLIC ${HIDAPI_INCLUDE_DIRS})
         target_link_libraries(ocrgb_core PUBLIC ${HIDAPI_LIBRARIES})
     endif()
+
+    # GPIO support (Raspberry Pi)
+    if(ENABLE_GPIO)
+        message(STATUS "  GPIO:        Enabled")
+
+        # Optional: rpi_ws281x for WS2812B
+        if(ENABLE_WS281X)
+            find_library(WS281X_LIB ws2811)
+            if(WS281X_LIB)
+                target_compile_definitions(ocrgb_core PUBLIC HAVE_WS281X)
+                target_link_libraries(ocrgb_core PUBLIC ${WS281X_LIB})
+                message(STATUS "  WS2812B:     Enabled (rpi_ws281x)")
+            else()
+                message(STATUS "  WS2812B:     Not found (install rpi_ws281x)")
+            endif()
+        endif()
+
+        # Optional: pigpio for PWM
+        if(ENABLE_PIGPIO)
+            find_library(PIGPIO_LIB pigpio)
+            if(PIGPIO_LIB)
+                target_compile_definitions(ocrgb_core PUBLIC HAVE_PIGPIO)
+                target_link_libraries(ocrgb_core PUBLIC ${PIGPIO_LIB})
+                message(STATUS "  pigpio:      Enabled")
+            else()
+                message(STATUS "  pigpio:      Not found (install pigpio)")
+            endif()
+        endif()
+    endif()
 endif()
 
 # =============================================================================
@@ -198,9 +239,14 @@ message(STATUS "  Build CLI:   ${BUILD_CLI}")
 message(STATUS "  Build Tests: ${BUILD_TESTS}")
 if(WIN32)
     message(STATUS "  SMBus:       PawnIO driver")
+    message(STATUS "  GPIO:        Not available")
 elseif(APPLE)
     message(STATUS "  SMBus:       Not available (HID only)")
+    message(STATUS "  GPIO:        Not available")
 elseif(UNIX)
     message(STATUS "  SMBus:       i2c-dev kernel module")
+    if(ENABLE_GPIO)
+        message(STATUS "  GPIO:        Enabled (Raspberry Pi)")
+    endif()
 endif()
 message(STATUS "")
