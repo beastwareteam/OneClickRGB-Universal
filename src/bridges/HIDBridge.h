@@ -79,6 +79,7 @@ public:
 private:
     hid_device* m_device = nullptr;
     DeviceAddress m_address;
+    bool m_dryRunMode = false;  // True when opened in dry-run mode
 
     hid_device* FindDevice(uint16_t vendorId, uint16_t productId,
                            uint16_t usagePage, uint16_t usage);

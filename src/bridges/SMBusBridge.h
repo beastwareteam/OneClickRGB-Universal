@@ -103,6 +103,7 @@ public:
 private:
     PawnIO_t m_pawnio = nullptr;
     bool m_initialized = false;
+    bool m_dryRunMode = false;  // True when initialized in dry-run mode
     uint8_t m_currentDeviceAddr = 0;
 
     // PawnIO function pointers (loaded dynamically)

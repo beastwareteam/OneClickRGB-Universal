@@ -5,6 +5,7 @@
 #include "HardwareScanner.h"
 #include "../bridges/HIDBridge.h"
 #include "../bridges/SMBusBridge.h"
+#include "../plugins/PluginFactory.h"
 #include <hidapi.h>
 
 namespace OCRGB {
@@ -266,15 +267,11 @@ DevicePtr HardwareScanner::CreateDevice(const ScanResult& result) {
         return nullptr;
     }
 
-    return CreateDevice(*result.knownDevice);
+    return PluginFactory::Create(*result.knownDevice, &result.address);
 }
 
 DevicePtr HardwareScanner::CreateDevice(const HardwareDB::DeviceDefinition& def) {
-    // This will be implemented when we add the plugin devices
-    // For now, return nullptr
-    // TODO: Create appropriate device based on def.id
-
-    return nullptr;
+    return PluginFactory::Create(def, nullptr);
 }
 
 } // namespace OCRGB

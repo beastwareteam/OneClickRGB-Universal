@@ -3,9 +3,26 @@
 //=============================================================================
 
 #include "HIDBridge.h"
+#include "../core/DryRunMode.h"
 #include <cstring>
+#include <sstream>
 
 namespace OCRGB {
+
+// Helper to format bytes for logging
+static std::string FormatBytes(const uint8_t* data, size_t length, size_t maxShow = 8) {
+    std::ostringstream ss;
+    ss << "[";
+    for (size_t i = 0; i < length && i < maxShow; i++) {
+        if (i > 0) ss << " ";
+        ss << std::hex << std::uppercase;
+        if (data[i] < 16) ss << "0";
+        ss << (int)data[i];
+    }
+    if (length > maxShow) ss << " ...+" << (length - maxShow);
+    ss << "]";
+    return ss.str();
+}
 
 HIDBridge::HIDBridge() = default;
 
@@ -54,6 +71,17 @@ bool HIDBridge::Open(uint16_t vendorId, uint16_t productId,
     m_address.usagePage = usagePage;
     m_address.usage = usage;
 
+    // Dry-run mode: simulate successful open
+    if (DryRun::IsEnabled()) {
+        std::ostringstream ss;
+        ss << "VID=0x" << std::hex << vendorId << " PID=0x" << productId;
+        if (usagePage) ss << " UsagePage=0x" << usagePage;
+        DryRun::Log("HIDBridge", "Open", ss.str());
+        m_dryRunMode = true;
+        ClearError();
+        return true;
+    }
+
     if (usagePage != 0 || usage != 0) {
         // Need to find specific device with usage page/usage
         m_device = FindDevice(vendorId, productId, usagePage, usage);
@@ -86,6 +114,12 @@ bool HIDBridge::OpenPath(const wchar_t* path) {
 }
 
 void HIDBridge::Close() {
+    if (m_dryRunMode) {
+        DryRun::Log("HIDBridge", "Close", "");
+        m_dryRunMode = false;
+        return;
+    }
+
     if (m_device) {
         hid_close(m_device);
         m_device = nullptr;
@@ -93,10 +127,16 @@ void HIDBridge::Close() {
 }
 
 bool HIDBridge::IsOpen() const {
-    return m_device != nullptr;
+    return m_device != nullptr || m_dryRunMode;
 }
 
 bool HIDBridge::Write(const uint8_t* data, size_t length) {
+    // Dry-run mode: log but don't write
+    if (m_dryRunMode) {
+        DryRun::Log("HIDBridge", "Write", FormatBytes(data, length) + " (" + std::to_string(length) + " bytes)");
+        return true;
+    }
+
     if (!m_device) {
         SetError("Device not open");
         return false;
@@ -120,6 +160,12 @@ bool HIDBridge::Write(const uint8_t* data, size_t length) {
 }
 
 int HIDBridge::Read(uint8_t* buffer, size_t length, int timeoutMs) {
+    // Dry-run mode: return empty read
+    if (m_dryRunMode) {
+        DryRun::Log("HIDBridge", "Read", "requested " + std::to_string(length) + " bytes, timeout=" + std::to_string(timeoutMs) + "ms");
+        return 0;  // No data in dry-run
+    }
+
     if (!m_device) {
         SetError("Device not open");
         return -1;
@@ -134,6 +180,12 @@ int HIDBridge::Read(uint8_t* buffer, size_t length, int timeoutMs) {
 }
 
 bool HIDBridge::SendFeatureReport(const uint8_t* data, size_t length) {
+    // Dry-run mode
+    if (m_dryRunMode) {
+        DryRun::Log("HIDBridge", "SendFeatureReport", FormatBytes(data, length));
+        return true;
+    }
+
     if (!m_device) {
         SetError("Device not open");
         return false;

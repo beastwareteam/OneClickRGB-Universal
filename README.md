@@ -37,6 +37,10 @@ See [docs/ADDING_DEVICES.md](docs/ADDING_DEVICES.md) for instructions on adding 
 
 ## Architecture
 
+Aktueller Architekturstand, Zielarchitektur und vollständiger Umsetzungsplan (März 2026):
+
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     APPLICATION LAYER                        │
@@ -93,51 +97,105 @@ compile.bat
 ```
 OneClickRGB-Universal/
 ├── src/
-│   ├── app/           # Application logic
-│   ├── core/          # Device registry, types
-│   ├── devices/       # Device base classes
-│   ├── plugins/       # Device implementations
+│   ├── OneClickRGB.h           # Simple API (include this!)
+│   ├── OneClickRGB.cpp
+│   ├── main.cpp                # CLI entry point
+│   ├── app/                    # Application layer (advanced)
+│   │   ├── config/
+│   │   ├── effects/
+│   │   ├── pipeline/
+│   │   └── services/
+│   ├── core/                   # Core types, DeviceRegistry
+│   ├── devices/                # IDevice, HIDDevice, SMBusDevice
+│   ├── plugins/                # Device implementations
 │   │   ├── asus/
 │   │   ├── steelseries/
 │   │   ├── evision/
-│   │   └── gskill/
-│   ├── bridges/       # Protocol bridges
-│   └── scanner/       # Hardware detection
+│   │   ├── gskill/
+│   │   └── PluginFactory.cpp
+│   ├── bridges/                # Protocol bridges
+│   └── scanner/                # Hardware detection
 ├── config/
-│   └── hardware_db.json
-├── tools/
-│   └── generate_config.py
+│   ├── hardware_db.json        # Device database
+│   └── *.schema.json           # JSON schemas
+├── docs/
 └── build/
     └── generated/
-        └── hardware_config.h
 ```
 
 ---
 
-## Usage Example
+## Usage
+
+### Command Line (No Configuration Required)
+
+```batch
+# Show detected devices
+oneclickrgb
+
+# Set color (RGB values)
+oneclickrgb set 255 0 128
+
+# Set color (hex)
+oneclickrgb set #FF0080
+
+# Turn off all LEDs
+oneclickrgb off
+
+# Change mode
+oneclickrgb mode rainbow
+
+# Set brightness
+oneclickrgb brightness 50
+```
+
+### C++ (Simple API)
 
 ```cpp
-#include "core/DeviceRegistry.h"
-#include "scanner/HardwareScanner.h"
+#include "OneClickRGB.h"
 
 int main() {
-    // Scan for devices
-    HardwareScanner scanner;
-    auto results = scanner.QuickScan();
+    OneClickRGB rgb;
+    rgb.Start();              // Auto-detect devices
+    rgb.SetColor(0, 100, 255);// Set color
+    rgb.SetModeRainbow();     // Change mode
+    rgb.Stop();               // Cleanup
+    return 0;
+}
+```
 
-    // Create and register devices
-    for (const auto& result : results) {
-        if (result.isKnown) {
-            auto device = scanner.CreateDevice(result);
-            if (device && device->Initialize().IsSuccess()) {
-                DeviceRegistry::Instance().RegisterDevice(device);
-            }
-        }
+### C++ (Global Functions)
+
+```cpp
+#include "OneClickRGB.h"
+
+int main() {
+    OCRGB_Start();
+    OCRGB_SetColor(255, 0, 128);
+    OCRGB_SetMode("breathing");
+    OCRGB_Stop();
+    return 0;
+}
+```
+
+### Advanced Usage (Full Control)
+
+For advanced use cases requiring per-device control, profiles, or custom pipelines:
+
+```cpp
+#include "app/services/DeviceService.h"
+#include "core/DeviceRegistry.h"
+
+int main() {
+    App::DeviceService service;
+    service.DiscoverAndRegister();
+
+    // Per-device control
+    auto devices = DeviceRegistry::Instance().GetAllDevices();
+    for (auto& device : devices) {
+        device->SetColor(RGB(255, 0, 0));
+        device->Apply();
     }
-
-    // Set color on all devices
-    DeviceRegistry::Instance().SetColorAll(RGB(0, 34, 255));
-    DeviceRegistry::Instance().ApplyAll();
 
     return 0;
 }

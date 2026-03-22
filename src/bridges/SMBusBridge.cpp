@@ -6,10 +6,22 @@
 //=============================================================================
 
 #include "SMBusBridge.h"
+#include "../core/DryRunMode.h"
 #include <Windows.h>
 #include <cstring>
+#include <sstream>
+#include <iomanip>
 
 namespace OCRGB {
+
+// Helper for SMBus logging
+static std::string FormatSMBusOp(uint8_t addr, uint8_t reg, const char* extra = nullptr) {
+    std::ostringstream ss;
+    ss << "addr=0x" << std::hex << std::setw(2) << std::setfill('0') << (int)addr;
+    ss << " reg=0x" << std::setw(2) << (int)reg;
+    if (extra) ss << " " << extra;
+    return ss.str();
+}
 
 //-----------------------------------------------------------------------------
 // PawnIO Function Types
@@ -116,6 +128,15 @@ void SMBusBridge::UnloadPawnIO() {
 bool SMBusBridge::Initialize() {
     if (m_initialized) return true;
 
+    // Dry-run mode: simulate successful init
+    if (DryRun::IsEnabled()) {
+        DryRun::Log("SMBusBridge", "Initialize", "simulated");
+        m_initialized = true;
+        m_dryRunMode = true;
+        ClearError();
+        return true;
+    }
+
     if (!LoadPawnIO()) {
         return false;
     }
@@ -135,6 +156,13 @@ bool SMBusBridge::Initialize() {
 
 void SMBusBridge::Shutdown() {
     if (!m_initialized) return;
+
+    if (m_dryRunMode) {
+        DryRun::Log("SMBusBridge", "Shutdown", "");
+        m_initialized = false;
+        m_dryRunMode = false;
+        return;
+    }
 
     if (pawnio_shutdown) {
         pawnio_shutdown();
@@ -191,6 +219,14 @@ int SMBusBridge::Read(uint8_t* buffer, size_t length, int /* timeoutMs */) {
 }
 
 bool SMBusBridge::WriteByte(uint8_t deviceAddr, uint8_t reg, uint8_t value) {
+    // Dry-run mode
+    if (m_dryRunMode) {
+        std::ostringstream ss;
+        ss << "value=0x" << std::hex << std::setw(2) << std::setfill('0') << (int)value;
+        DryRun::Log("SMBusBridge", "WriteByte", FormatSMBusOp(deviceAddr, reg, ss.str().c_str()));
+        return true;
+    }
+
     if (!m_initialized || !pawnio_write_byte) {
         SetError("SMBus not initialized");
         return false;
@@ -221,6 +257,14 @@ bool SMBusBridge::WriteWord(uint8_t deviceAddr, uint8_t reg, uint16_t value) {
 }
 
 bool SMBusBridge::WriteBlock(uint8_t deviceAddr, uint8_t reg, const uint8_t* data, size_t length) {
+    // Dry-run mode
+    if (m_dryRunMode) {
+        std::ostringstream ss;
+        ss << "len=" << length;
+        DryRun::Log("SMBusBridge", "WriteBlock", FormatSMBusOp(deviceAddr, reg, ss.str().c_str()));
+        return true;
+    }
+
     if (!m_initialized) {
         SetError("SMBus not initialized");
         return false;
@@ -255,6 +299,13 @@ bool SMBusBridge::QuickCommand(uint8_t /* deviceAddr */, bool /* read */) {
 }
 
 bool SMBusBridge::ReadByte(uint8_t deviceAddr, uint8_t reg, uint8_t& value) {
+    // Dry-run mode: return dummy value
+    if (m_dryRunMode) {
+        DryRun::Log("SMBusBridge", "ReadByte", FormatSMBusOp(deviceAddr, reg));
+        value = 0x00;
+        return true;
+    }
+
     if (!m_initialized || !pawnio_read_byte) {
         SetError("SMBus not initialized");
         return false;
@@ -317,6 +368,14 @@ int SMBusBridge::ScanBus(std::vector<uint8_t>& addresses) {
 
     if (!m_initialized) {
         return 0;
+    }
+
+    // Dry-run mode: return simulated G.Skill RAM addresses
+    if (m_dryRunMode) {
+        DryRun::Log("SMBusBridge", "ScanBus", "simulated scan 0x08-0x77");
+        addresses.push_back(0x58);  // Simulated G.Skill slot A1
+        addresses.push_back(0x59);  // Simulated G.Skill slot A2
+        return (int)addresses.size();
     }
 
     // Scan typical SMBus address range (0x08 - 0x77)

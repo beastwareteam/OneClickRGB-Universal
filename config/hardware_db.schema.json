@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oneclickrgb.local/schemas/hardware_db.schema.json",
+  "title": "OneClickRGB Hardware Database",
+  "description": "Schema for the hardware device database used by OneClickRGB-Universal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "lastUpdated", "vendors", "devices"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "SemVer version of the database"
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date",
+      "description": "Last update date (YYYY-MM-DD)"
+    },
+    "vendors": {
+      "type": "object",
+      "description": "Vendor definitions keyed by vendor ID",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name of the vendor"
+          },
+          "website": {
+            "type": "string",
+            "description": "Vendor website URL"
+          }
+        }
+      }
+    },
+    "devices": {
+      "type": "array",
+      "description": "List of supported devices",
+      "items": {
+        "$ref": "#/$defs/deviceDefinition"
+      }
+    },
+    "protocolTemplates": {
+      "type": "object",
+      "description": "Protocol template definitions",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "documentation": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "deviceDefinition": {
+      "type": "object",
+      "required": ["id", "name", "vendor", "type", "identifiers", "capabilities"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "description": "Unique device identifier (snake_case)"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display name of the device"
+        },
+        "vendor": {
+          "type": "string",
+          "description": "Vendor ID (must match key in vendors object)"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "mainboard",
+            "gpu",
+            "ram",
+            "keyboard",
+            "mouse",
+            "mousepad",
+            "headset",
+            "controller",
+            "ledstrip",
+            "fan",
+            "aio",
+            "case",
+            "other"
+          ],
+          "description": "Device type category"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["hid", "smbus", "i2c", "usb_bulk", "usb_interrupt", "serial", "network"],
+          "description": "Communication protocol"
+        },
+        "bus": {
+          "type": "string",
+          "enum": ["hid", "smbus", "i2c", "usb_bulk", "usb_interrupt", "serial", "network"],
+          "description": "Alternative field for protocol (deprecated, use 'protocol')"
+        },
+        "identifiers": {
+          "$ref": "#/$defs/deviceIdentifiers"
+        },
+        "capabilities": {
+          "$ref": "#/$defs/deviceCapabilities"
+        }
+      }
+    },
+    "deviceIdentifiers": {
+      "type": "object",
+      "description": "Device identification parameters",
+      "properties": {
+        "vendorId": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$",
+          "description": "USB Vendor ID (HID/USB devices)"
+        },
+        "productId": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$",
+          "description": "USB Product ID (HID/USB devices)"
+        },
+        "usagePage": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$",
+          "description": "HID Usage Page"
+        },
+        "smbusAddresses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^0x[0-9A-Fa-f]{2}$"
+          },
+          "description": "SMBus device addresses (SMBus devices)"
+        }
+      }
+    },
+    "deviceCapabilities": {
+      "type": "object",
+      "description": "Device capability flags",
+      "properties": {
+        "color": {
+          "type": "boolean",
+          "default": true,
+          "description": "Supports RGB color control"
+        },
+        "brightness": {
+          "type": "boolean",
+          "default": true,
+          "description": "Supports brightness control"
+        },
+        "speed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Supports animation speed control"
+        },
+        "direction": {
+          "type": "boolean",
+          "default": false,
+          "description": "Supports direction control"
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "off",
+              "static",
+              "breathing",
+              "wave",
+              "spectrum",
+              "reactive",
+              "colorcycle",
+              "gradient",
+              "custom"
+            ]
+          },
+          "uniqueItems": true,
+          "description": "Supported lighting modes"
+        },
+        "zones": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Number of independent lighting zones"
+        },
+        "addressable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Supports per-LED addressing"
+        },
+        "ledsPerZone": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Number of LEDs per zone"
+        }
+      }
+    }
+  }
+}

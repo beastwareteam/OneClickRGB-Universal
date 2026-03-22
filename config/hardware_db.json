@@ -1,5 +1,5 @@
 {
-    "$schema": "./schemas/hardware_db.schema.json",
+    "$schema": "./hardware_db.schema.json",
     "version": "1.0.0",
     "lastUpdated": "2026-03-21",
 

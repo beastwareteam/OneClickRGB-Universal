@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oneclickrgb.local/schemas/config_bundle.schema.json",
+  "title": "OneClickRGB Config Bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundleVersion",
+    "createdAt",
+    "target",
+    "profiles",
+    "policies",
+    "integrity"
+  ],
+  "properties": {
+    "bundleVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "arch"],
+      "properties": {
+        "os": { "const": "windows" },
+        "arch": { "enum": ["x64", "arm64"] }
+      }
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "priority", "match", "actions"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "priority": { "type": "integer", "minimum": 0, "maximum": 1000 },
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "machineId": { "type": "string" },
+              "vendors": {
+                "type": "array",
+                "items": { "type": "string" },
+                "uniqueItems": true
+              },
+              "deviceTypes": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "Mainboard",
+                    "GPU",
+                    "RAM",
+                    "Keyboard",
+                    "Mouse",
+                    "Mousepad",
+                    "Headset",
+                    "Controller",
+                    "LEDStrip",
+                    "Fan",
+                    "AIO",
+                    "Case",
+                    "Other"
+                  ]
+                },
+                "uniqueItems": true
+              },
+              "tags": {
+                "type": "array",
+                "items": { "type": "string" },
+                "uniqueItems": true
+              }
+            }
+          },
+          "actions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["op"],
+              "properties": {
+                "op": {
+                  "enum": [
+                    "set-mode",
+                    "set-color",
+                    "set-brightness",
+                    "set-speed",
+                    "apply"
+                  ]
+                },
+                "value": {
+                  "type": ["string", "number", "integer"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowRawPackets", "maxRetry", "rollbackOnError"],
+      "properties": {
+        "allowRawPackets": { "type": "boolean" },
+        "maxRetry": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "rollbackOnError": { "type": "boolean" }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hash", "signature", "keyId"],
+      "properties": {
+        "hash": { "type": "string", "pattern": "^sha256:.+" },
+        "signature": { "type": "string", "minLength": 8 },
+        "keyId": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

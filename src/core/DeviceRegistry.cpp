@@ -1,6 +1,10 @@
 //=============================================================================
 // OneClickRGB-Universal - Device Registry Implementation
 //=============================================================================
+// Note: DiscoverDevices() has been moved to App::DeviceService to maintain
+// proper module boundaries (core must not depend on app layer).
+// Use App::DeviceService::DiscoverAndRegister() for discovery with pipeline.
+//=============================================================================
 
 #include "DeviceRegistry.h"
 #include "../scanner/HardwareScanner.h"
@@ -120,6 +124,8 @@ void DeviceRegistry::TurnOffAll() {
 }
 
 int DeviceRegistry::DiscoverDevices() {
+    // Basic discovery without pipeline (for backwards compatibility).
+    // For full provisioning with pipeline, use App::DeviceService::DiscoverAndRegister()
     HardwareScanner scanner;
     auto results = scanner.QuickScan();
 
